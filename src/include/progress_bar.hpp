@@ -131,9 +131,9 @@ namespace ns_pbar {
       // task count
       auto taskCountStrSize = std::to_string(this->_taskCount).size();
       auto curCountStrSize = std::to_string(idx).size();
-      std::string taskCountStr = '[' + std::string(taskCountStrSize - curCountStrSize, ' ') +
+      std::string taskCountStr = std::string(taskCountStrSize - curCountStrSize, ' ') +
                                  std::to_string(idx) + "/" +
-                                 std::to_string(this->_taskCount) + ']';
+                                 std::to_string(this->_taskCount);
 
       // percent
       double curPercent = static_cast<double>(idx) / this->_taskCount;
@@ -141,66 +141,57 @@ namespace ns_pbar {
       stream << std::fixed << std::setprecision(1) << curPercent * 100.0;
       std::string curPercentStr;
       stream >> curPercentStr;
-      std::string percentStr = '[' + std::string(5 - curPercentStr.size(), ' ') + curPercentStr + "%]";
+      std::string percentStr = std::string(5 - curPercentStr.size(), ' ') + curPercentStr;
 
       // time
       stream = std::stringstream();
       stream << std::fixed << std::setprecision(3) << ProgressBar::curTime() - _startTimePoint;
       std::string timeCostStr;
       stream >> timeCostStr;
-      timeCostStr = "-[" + timeCostStr + "(S)]";
 
 #if (defined __linux__) && (defined PROGRESS_COLOR_BAR)
       // bar
-      unsigned short barWidth = progressBarWidth - percentStr.size() - 4 - taskCountStrSize * 2 - 3;
+      unsigned short barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - 9;
       auto fillWidth = static_cast<unsigned short>(barWidth * curPercent);
       unsigned short emptyWidth = barWidth - fillWidth;
 
-      std::string fillStr = std::string(fillWidth, ' ');
-      std::string emptyStr = std::string(emptyWidth, ' ');
+      std::string fillStr;
+      std::string emptyStr;
+
+      std::string progressBarStr = std::string(barWidth, ' ');
 
       if (_desc.size() <= barWidth) {
-
+        // fill description string
         unsigned short descStartPos = (barWidth - _desc.size()) / 2;
         unsigned short descEndPos = descStartPos + _desc.size();
-
-        // replace for the '_desc'
-        if (descStartPos > fillStr.size()) {
-          // '_desc' is all in 'emptyStr'
-          emptyStr.replace(emptyStr.begin() + descStartPos - fillStr.size(), emptyStr.begin() + descEndPos - fillStr.size(), _desc);
-        } else if (descEndPos < fillStr.size()) {
-          // '_desc' is all in 'fillStr'
-          fillStr.replace(fillStr.begin() + descStartPos, fillStr.begin() + descEndPos, _desc);
-        } else {
-          // '_desc' is in 'fillStr' and 'emptyStr'
-          fillStr.replace(fillStr.begin() + descStartPos, fillStr.end(),
-                          std::string(_desc.begin(), _desc.begin() + fillStr.size() - descStartPos));
-          emptyStr.replace(emptyStr.begin(), emptyStr.begin() + descEndPos - fillStr.size(),
-                           std::string(_desc.begin() + fillStr.size() - descStartPos, _desc.end()));
-        }
+        progressBarStr.replace(progressBarStr.begin() + descStartPos, progressBarStr.begin() + descEndPos, _desc);
       }
 
-      std::string progressBarStr = ProgressBar::colorFlag(this->_fillColor) + "\033[3m" + fillStr + ProgressBar::colorFlag(BarColor::NONE) +
-                                   ProgressBar::colorFlag(this->_emptyColor) + "\033[3m" + emptyStr + ProgressBar::colorFlag(BarColor::NONE);
-      this->printBar(taskCountStr + " |" + progressBarStr + "| " + percentStr + timeCostStr);
+      fillStr = ProgressBar::colorFlag(this->_fillColor) + "\033[3m" + progressBarStr.substr(0, fillWidth) + ProgressBar::colorFlag(BarColor::NONE);
+      emptyStr = ProgressBar::colorFlag(this->_emptyColor) + "\033[3m" + progressBarStr.substr(fillWidth) + ProgressBar::colorFlag(BarColor::NONE);
+
+      progressBarStr = fillStr + emptyStr;
+
+      this->printBar('[' + taskCountStr + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
 #else
       // bar
-      int barWidth = progressBarWidth - percentStr.size() - 4 - taskCountStrSize * 2 - 3 - _desc.size() - 3;
+      int barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - _desc.size() - 12;
       // if left char size is small, than add more.
-      if (barWidth < 5)
+      if (barWidth < 5) {
+        progressBarWidth += 5 - barWidth;
         barWidth = 5;
+      }
       unsigned short fillWidth = barWidth * curPercent;
       unsigned short emptyWidth = barWidth - fillWidth;
 
       std::string fillStr = std::string(fillWidth, '@');
       std::string emptyStr = std::string(emptyWidth, '-');
       std::string progressBarStr = fillStr + emptyStr;
-      std::string descStr = "-[" + _desc + ']';
 
-      this->printBar(taskCountStr + descStr + " |" + progressBarStr + "| " + percentStr + timeCostStr);
+      this->printBar('[' + taskCountStr + "]-[" + _desc + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
 #endif
 
-      _lastProgressBarWidth = progressBarWidth + timeCostStr.size();
+      _lastProgressBarWidth = progressBarWidth + timeCostStr.size() + 6;
       return *this;
     }
 
