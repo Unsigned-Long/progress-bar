@@ -11,9 +11,9 @@ int main(int argc, char const *argv[]) {
       bar.clear();
       std::cout << "Hello, world" << std::endl;
       bar.show(i);
-      // way 2
+      // way 2 [this way makes code clean]
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      bar.update(i, [&i]() {
+      bar.update(i, [&]() {
         std::cout << "cur Idx is " << i << std::endl;
       });
     }

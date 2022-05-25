@@ -8,6 +8,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <utility>
 #ifdef __linux__
 #include <sys/ioctl.h>
 #else
@@ -63,7 +64,7 @@ namespace ns_pbar {
     // if thw progress bar is released
     bool _isReleased;
     // used to clear the last progress bar
-    unsigned short _lastProgressBarWidth;
+    unsigned short _lastProgressBarWidth{};
 
     const double _startTimePoint;
 
@@ -71,10 +72,10 @@ namespace ns_pbar {
     /**
      * @brief Construct a new Progress Bar object
      */
-    ProgressBar(unsigned short taskCount, const std::string &desc = "New Task",
-                BarColor fillColor = BarColor::WHITE, BarColor emptyColor = BarColor::NONE,
-                std::ostream &os = std::clog)
-        : _taskCount(taskCount), _desc(desc), _fillColor(fillColor), _emptyColor(emptyColor),
+    explicit ProgressBar(unsigned short taskCount, std::string desc = "New Task",
+                         BarColor fillColor = BarColor::WHITE, BarColor emptyColor = BarColor::NONE,
+                         std::ostream &os = std::clog)
+        : _taskCount(taskCount), _desc(std::move(desc)), _fillColor(fillColor), _emptyColor(emptyColor),
           _os(&os), _isReleased(false), _startTimePoint(ProgressBar::curTime()) {}
 
     /**
@@ -125,7 +126,7 @@ namespace ns_pbar {
       }
       idx += 1;
       this->checkIdx(idx);
-      unsigned short progressBarWidth = ProgressBar::winWidth() * 0.7;
+      auto progressBarWidth = static_cast<unsigned short>(ProgressBar::winWidth() * 0.7);
 
       // task count
       auto taskCountStrSize = std::to_string(this->_taskCount).size();
@@ -152,7 +153,7 @@ namespace ns_pbar {
 #if (defined __linux__) && (defined PROGRESS_COLOR_BAR)
       // bar
       unsigned short barWidth = progressBarWidth - percentStr.size() - 4 - taskCountStrSize * 2 - 3;
-      unsigned short fillWidth = barWidth * curPercent;
+      auto fillWidth = static_cast<unsigned short>(barWidth * curPercent);
       unsigned short emptyWidth = barWidth - fillWidth;
 
       std::string fillStr = std::string(fillWidth, ' ');
@@ -210,7 +211,7 @@ namespace ns_pbar {
       if (this->_isReleased) {
         return *this;
       }
-      *this->_os << (std::string(_lastProgressBarWidth, ' ') + "\r") << std::flush;
+      *this->_os << ("\r" + std::string(_lastProgressBarWidth, ' ') + "\r") << std::flush;
       return *this;
     }
 
@@ -220,9 +221,8 @@ namespace ns_pbar {
      */
     void checkIdx(unsigned short idx) const {
       if (idx > this->_taskCount) {
-        THROW_EXCEPTION(checkIdx, "the index is out of range. ['curTaskIdx' > 'taskCount'].");
+        THROW_EXCEPTION(checkIdx, "the index is out of range. ['curTaskIdx' > 'taskCount'].")
       }
-      return;
     }
 
     /**
@@ -231,8 +231,7 @@ namespace ns_pbar {
      * @param barStr
      */
     void printBar(const std::string &barStr) {
-      *(this->_os) << barStr << '\r' << std::flush;
-      return;
+      *(this->_os) << barStr << std::flush;
     }
 
     /**
@@ -240,7 +239,7 @@ namespace ns_pbar {
      */
     static unsigned short winWidth() {
 #ifdef __linux__
-      struct winsize win;
+      struct winsize win {};
       ioctl(0, TIOCGWINSZ, &win);
       unsigned short width = win.ws_col;
 #else
