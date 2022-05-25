@@ -2,6 +2,7 @@
 #define PROGRESS_BAR_H
 
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -47,7 +48,7 @@ namespace ns_pbar {
   class ProgressBar {
   private:
     // Total number of tasks
-    const std::size_t _taskCount;
+    const unsigned short _taskCount;
     // the description for these tasks
     const std::string _desc;
 
@@ -55,23 +56,26 @@ namespace ns_pbar {
     const BarColor _fillColor;
     // the progress bar color [empty]
     const BarColor _emptyColor;
-
     // the output stream
     std::ostream *_os;
 
+    // inner parameters
+    // if thw progress bar is released
     bool _isReleased;
+    // used to clear the last progress bar
+    unsigned short _lastProgressBarWidth;
 
-    std::size_t _lastProgressBarWidth;
+    const double _startTimePoint;
 
   public:
     /**
      * @brief Construct a new Progress Bar object
      */
-    ProgressBar(std::size_t taskCount, const std::string &desc = "New Task",
+    ProgressBar(unsigned short taskCount, const std::string &desc = "New Task",
                 BarColor fillColor = BarColor::WHITE, BarColor emptyColor = BarColor::NONE,
                 std::ostream &os = std::clog)
         : _taskCount(taskCount), _desc(desc), _fillColor(fillColor), _emptyColor(emptyColor),
-          _os(&os), _isReleased(false) {}
+          _os(&os), _isReleased(false), _startTimePoint(ProgressBar::curTime()) {}
 
     /**
      * @brief Destroy the Progress Bar object
@@ -98,7 +102,7 @@ namespace ns_pbar {
      * @param fun the function to
      * @return ProgressBar&
      */
-    ProgressBar &update(std::size_t idx, const std::function<void()> &fun) {
+    ProgressBar &update(unsigned short idx, const std::function<void()> &fun) {
       this->clear();
       fun();
       this->show(idx);
@@ -108,28 +112,20 @@ namespace ns_pbar {
     /**
      * @brief get the task count for the progress bar
      */
-    std::size_t taskCount() const {
+    unsigned short taskCount() const {
       return this->_taskCount;
     }
 
     /**
      * @brief print next progress bar, it's called when a task is done usually
      */
-    ProgressBar &show(std::size_t idx) {
+    ProgressBar &show(unsigned short idx) {
       if (this->_isReleased) {
         return *this;
       }
       idx += 1;
       this->checkIdx(idx);
-      std::size_t progressBarWidth = ProgressBar::winWidth() * 0.8;
-      // percent
-
-      double curPercent = static_cast<double>(idx) / this->_taskCount;
-      std::stringstream stream;
-      stream << std::fixed << std::setprecision(1) << curPercent * 100.0;
-      std::string curPercentStr;
-      stream >> curPercentStr;
-      std::string percentStr = '[' + std::string(5 - curPercentStr.size(), ' ') + curPercentStr + "%]";
+      unsigned short progressBarWidth = ProgressBar::winWidth() * 0.7;
 
       // task count
       auto taskCountStrSize = std::to_string(this->_taskCount).size();
@@ -138,19 +134,34 @@ namespace ns_pbar {
                                  std::to_string(idx) + "/" +
                                  std::to_string(this->_taskCount) + ']';
 
+      // percent
+      double curPercent = static_cast<double>(idx) / this->_taskCount;
+      std::stringstream stream;
+      stream << std::fixed << std::setprecision(1) << curPercent * 100.0;
+      std::string curPercentStr;
+      stream >> curPercentStr;
+      std::string percentStr = '[' + std::string(5 - curPercentStr.size(), ' ') + curPercentStr + "%]";
+
+      // time
+      stream = std::stringstream();
+      stream << std::fixed << std::setprecision(3) << ProgressBar::curTime() - _startTimePoint;
+      std::string timeCostStr;
+      stream >> timeCostStr;
+      timeCostStr = "-[" + timeCostStr + "(S)]";
+
 #if (defined __linux__) && (defined PROGRESS_COLOR_BAR)
       // bar
-      std::size_t barWidth = progressBarWidth - percentStr.size() - 4 - taskCountStrSize * 2 - 3;
-      std::size_t fillWidth = barWidth * curPercent;
-      std::size_t emptyWidth = barWidth - fillWidth;
+      unsigned short barWidth = progressBarWidth - percentStr.size() - 4 - taskCountStrSize * 2 - 3;
+      unsigned short fillWidth = barWidth * curPercent;
+      unsigned short emptyWidth = barWidth - fillWidth;
 
       std::string fillStr = std::string(fillWidth, ' ');
       std::string emptyStr = std::string(emptyWidth, ' ');
 
       if (_desc.size() <= barWidth) {
 
-        std::size_t descStartPos = (barWidth - _desc.size()) / 2;
-        std::size_t descEndPos = descStartPos + _desc.size();
+        unsigned short descStartPos = (barWidth - _desc.size()) / 2;
+        unsigned short descEndPos = descStartPos + _desc.size();
 
         // replace for the '_desc'
         if (descStartPos > fillStr.size()) {
@@ -170,25 +181,25 @@ namespace ns_pbar {
 
       std::string progressBarStr = ProgressBar::colorFlag(this->_fillColor) + "\033[3m" + fillStr + ProgressBar::colorFlag(BarColor::NONE) +
                                    ProgressBar::colorFlag(this->_emptyColor) + "\033[3m" + emptyStr + ProgressBar::colorFlag(BarColor::NONE);
-
-      this->printBar(percentStr + " |" + progressBarStr + "| " + taskCountStr, idx);
+      this->printBar(taskCountStr + " |" + progressBarStr + "| " + percentStr + timeCostStr);
 #else
       // bar
       int barWidth = progressBarWidth - percentStr.size() - 4 - taskCountStrSize * 2 - 3 - _desc.size() - 3;
       // if left char size is small, than add more.
       if (barWidth < 5)
         barWidth = 5;
-      std::size_t fillWidth = barWidth * curPercent;
-      std::size_t emptyWidth = barWidth - fillWidth;
+      unsigned short fillWidth = barWidth * curPercent;
+      unsigned short emptyWidth = barWidth - fillWidth;
 
       std::string fillStr = std::string(fillWidth, '@');
       std::string emptyStr = std::string(emptyWidth, '-');
       std::string progressBarStr = fillStr + emptyStr;
       std::string descStr = "-[" + _desc + ']';
 
-      this->printBar(percentStr + descStr + " |" + progressBarStr + "| " + taskCountStr, idx);
+      this->printBar(taskCountStr + descStr + " |" + progressBarStr + "| " + percentStr + timeCostStr);
 #endif
 
+      _lastProgressBarWidth = progressBarWidth + timeCostStr.size();
       return *this;
     }
 
@@ -207,7 +218,7 @@ namespace ns_pbar {
     /**
      * @brief check the current task index
      */
-    void checkIdx(std::size_t idx) const {
+    void checkIdx(unsigned short idx) const {
       if (idx > this->_taskCount) {
         THROW_EXCEPTION(checkIdx, "the index is out of range. ['curTaskIdx' > 'taskCount'].");
       }
@@ -219,8 +230,7 @@ namespace ns_pbar {
      *
      * @param barStr
      */
-    void printBar(const std::string &barStr, std::size_t idx) {
-      _lastProgressBarWidth = barStr.size();
+    void printBar(const std::string &barStr) {
       *(this->_os) << barStr << '\r' << std::flush;
       return;
     }
@@ -246,6 +256,11 @@ namespace ns_pbar {
      */
     static std::string colorFlag(int color) {
       return "\033[" + std::to_string(color) + "m";
+    }
+
+    static double curTime() {
+      auto time = std::chrono::system_clock::now().time_since_epoch();
+      return std::chrono::duration_cast<std::chrono::duration<double>>(time).count();
     }
   };
 #undef THROW_EXCEPTION

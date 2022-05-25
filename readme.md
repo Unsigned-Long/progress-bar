@@ -16,7 +16,7 @@ code:
 
 <img src="./output/code.png">
 
-output
+output:
 
 <img src="./output/charset.png">
 
@@ -27,6 +27,12 @@ output
 <img src="./output/red_light_yellow.png">
 
 ## 3. Apis
+
+the macro below controls the color, if this macro defined, the progress bar will be printed with color.
+
+```cpp
+#define PROGRESS_COLOR_BAR
+```
 
 ```cpp
 enum BarColor : int {
