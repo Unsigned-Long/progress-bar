@@ -122,7 +122,6 @@ namespace ns_pbar {
       idx += 1;
       this->checkIdx(idx);
       std::size_t progressBarWidth = ProgressBar::winWidth() * 0.8;
-      _lastProgressBarWidth = progressBarWidth;
       // percent
 
       double curPercent = static_cast<double>(idx) / this->_taskCount;
@@ -175,7 +174,10 @@ namespace ns_pbar {
       this->printBar(percentStr + " |" + progressBarStr + "| " + taskCountStr, idx);
 #else
       // bar
-      std::size_t barWidth = progressBarWidth - percentStr.size() - 4 - taskCountStrSize * 2 - 3 - _desc.size() - 3;
+      int barWidth = progressBarWidth - percentStr.size() - 4 - taskCountStrSize * 2 - 3 - _desc.size() - 3;
+      // if left char size is small, than add more.
+      if (barWidth < 5)
+        barWidth = 5;
       std::size_t fillWidth = barWidth * curPercent;
       std::size_t emptyWidth = barWidth - fillWidth;
 
@@ -218,6 +220,7 @@ namespace ns_pbar {
      * @param barStr
      */
     void printBar(const std::string &barStr, std::size_t idx) {
+      _lastProgressBarWidth = barStr.size();
       *(this->_os) << barStr << '\r' << std::flush;
       return;
     }

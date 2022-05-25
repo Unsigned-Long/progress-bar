@@ -1,10 +1,10 @@
-#define PROGRESS_COLOR_BAR
+// #define PROGRESS_COLOR_BAR
 #include "progress_bar.hpp"
 #include <thread>
 
 int main(int argc, char const *argv[]) {
   try {
-    ns_pbar::ProgressBar bar(30, "test for progress bar", ns_pbar::RED, ns_pbar::LIGHT_YELLOW);
+    ns_pbar::ProgressBar bar(30, "test for progress bar");
     for (int i = 0; i != 30; ++i) {
       // way 1
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
