@@ -18,6 +18,8 @@ code:
 
 output
 
+<img src="./output/charset.png">
+
 <img src="./output/default.png">
 
 <img src="./output/green_light_blue.png">
@@ -87,13 +89,13 @@ ProgressBar &clear();
  * @param fun the function to
  * @return ProgressBar&
  */
-ProgressBar &update(std::size_t idx, const std::function<void()> &fun)
+ProgressBar &update(std::size_t idx, const std::function<void()> &fun);
 ```
 
 ```cpp
 /**
  * @brief release the progress bar, which means subsequent messages will be printed below the progress bar
  */
-ProgressBar &release()
+ProgressBar &release();
 ```
 
