@@ -75,16 +75,23 @@ std::size_t taskCount() const;
 
 ```cpp
 /**
+ * @brief Set the Task Idx which would been displayed
+ */
+ProgressBar &setCurTask(unsigned short idx;
+```
+
+```cpp
+/**
  * @brief print next progress bar, it's called when a task is done usually
  */
-ProgressBar &show(std::size_t idx);
+ProgressBar &unlock(std::size_t idx);
 ```
 
 ```cpp
 /**
  * @brief clear the progress bar
  */
-ProgressBar &clear();
+ProgressBar &lock();
 ```
 
 ```cpp
@@ -95,7 +102,7 @@ ProgressBar &clear();
  * @param fun the function to
  * @return ProgressBar&
  */
-ProgressBar &update(std::size_t idx, const std::function<void()> &fun);
+ProgressBar &lockAndUnlock(std::size_t idx, const std::function<void()> &fun);
 ```
 
 ```cpp
