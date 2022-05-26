@@ -1,6 +1,6 @@
-#define PROGRESS_COLOR_BAR
+#define PAR_USE_COLOR
 #include "artwork/timer/timer.h"
-#include "progress_bar.hpp"
+#include "progressbar.hpp"
 #include <thread>
 
 int main(int argc, char const *argv[]) {
@@ -9,15 +9,16 @@ int main(int argc, char const *argv[]) {
     for (int i = 0; i != 30; ++i) {
       // way 1
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      bar.clear();
+      bar.lock();
       std::cout << "Hello, world" << std::endl;
-      bar.show(i);
+      bar.unlock();
 
       // way 2 [this way makes code clean]
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      bar.update(i, [&]() {
+      bar.lockAndUnlock([&]() {
         std::cout << "cur Idx is " << i << std::endl;
       });
+      bar.setCurTask(i);
     }
     // use 'release' to stop the progress bar
     bar.release();

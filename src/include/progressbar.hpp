@@ -65,8 +65,11 @@ namespace ns_pbar {
     bool _isReleased;
     // used to clear the last progress bar
     unsigned short _lastProgressBarWidth{};
-
+    // the start time point
     const double _startTimePoint;
+    // the task index to display
+    unsigned short _taskIdxToShow;
+    // the thread to display progress bar
 
   public:
     /**
@@ -76,7 +79,7 @@ namespace ns_pbar {
                          BarColor fillColor = BarColor::WHITE, BarColor emptyColor = BarColor::NONE,
                          std::ostream &os = std::clog)
         : _taskCount(taskCount), _desc(std::move(desc)), _fillColor(fillColor), _emptyColor(emptyColor),
-          _os(&os), _isReleased(false), _startTimePoint(ProgressBar::curTime()) {}
+          _os(&os), _isReleased(false), _startTimePoint(ProgressBar::curTime()), _taskIdxToShow(0) {}
 
     /**
      * @brief Destroy the Progress Bar object
@@ -97,16 +100,25 @@ namespace ns_pbar {
     }
 
     /**
-     * @brief update the progress bar
+     * @brief lock the progress bar and output something using standard ostream
      *
-     * @param idx the index of the task
      * @param fun the function to
-     * @return ProgressBar&
      */
-    ProgressBar &update(unsigned short idx, const std::function<void()> &fun) {
-      this->clear();
+    ProgressBar &lockAndUnlock(const std::function<void()> &fun) {
+      this->lock();
       fun();
-      this->show(idx);
+      this->unlock();
+      return *this;
+    }
+
+    /**
+     * @brief Set the Task Idx which would been displayed
+     */
+    ProgressBar &setCurTask(unsigned short idx) {
+      this->checkIdx(idx);
+      // show at once
+      this->_taskIdxToShow = idx;
+      this->lock().unlock();
       return *this;
     }
 
@@ -120,12 +132,9 @@ namespace ns_pbar {
     /**
      * @brief print next progress bar, it's called when a task is done usually
      */
-    ProgressBar &show(unsigned short idx) {
-      if (this->_isReleased) {
-        return *this;
-      }
+    ProgressBar &unlock() {
+      unsigned short idx = this->_taskIdxToShow;
       idx += 1;
-      this->checkIdx(idx);
       auto progressBarWidth = static_cast<unsigned short>(ProgressBar::winWidth() * 0.7);
 
       // task count
@@ -149,7 +158,7 @@ namespace ns_pbar {
       std::string timeCostStr;
       stream >> timeCostStr;
 
-#if (defined __linux__) && (defined PROGRESS_COLOR_BAR)
+#if (defined __linux__) && (defined PAR_USE_COLOR)
       // bar
       unsigned short barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - 9;
       auto fillWidth = static_cast<unsigned short>(barWidth * curPercent);
@@ -198,10 +207,7 @@ namespace ns_pbar {
     /**
      * @brief clear the progress bar
      */
-    ProgressBar &clear() {
-      if (this->_isReleased) {
-        return *this;
-      }
+    ProgressBar &lock() {
       *this->_os << ("\r" + std::string(_lastProgressBarWidth, ' ') + "\r") << std::flush;
       return *this;
     }
@@ -211,7 +217,7 @@ namespace ns_pbar {
      * @brief check the current task index
      */
     void checkIdx(unsigned short idx) const {
-      if (idx > this->_taskCount) {
+      if (idx >= this->_taskCount) {
         THROW_EXCEPTION(checkIdx, "the index is out of range. ['curTaskIdx' > 'taskCount'].")
       }
     }
@@ -253,6 +259,7 @@ namespace ns_pbar {
       return std::chrono::duration_cast<std::chrono::duration<double>>(time).count();
     }
   };
+
 #undef THROW_EXCEPTION
 
 } // namespace ns_pbar
