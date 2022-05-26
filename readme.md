@@ -63,7 +63,7 @@ enum BarColor : int {
 /**
  * @brief Construct a new Progress Bar object
  */
-ProgressBar(std::size_t taskCount, const std::string &desc = "New Task", BarColor fillColor = BarColor::WHITE, BarColor emptyColor = BarColor::NONE, std::ostream &os = std::clog);
+explicit ProgressBar(unsigned short taskCount, BarColor fillColor = BarColor::WHITE, BarColor emptyColor = BarColor::NONE, std::ostream &os = std::clog);
 ```
 
 ```cpp
@@ -77,14 +77,14 @@ std::size_t taskCount() const;
 /**
  * @brief Set the Task Idx which would been displayed
  */
-ProgressBar &setCurTask(unsigned short idx;
+ProgressBar &setCurTask(unsigned short idx, const std::string &desc);
 ```
 
 ```cpp
 /**
  * @brief print next progress bar, it's called when a task is done usually
  */
-ProgressBar &unlock(std::size_t idx);
+ProgressBar &unlock();
 ```
 
 ```cpp
@@ -102,7 +102,7 @@ ProgressBar &lock();
  * @param fun the function to
  * @return ProgressBar&
  */
-ProgressBar &lockAndUnlock(std::size_t idx, const std::function<void()> &fun);
+ProgressBar &lockAndUnlock(const std::function<void()> &fun);
 ```
 
 ```cpp

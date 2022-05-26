@@ -44,15 +44,12 @@ namespace ns_pbar {
   };
 
 #define THROW_EXCEPTION(where, what) \
-  throw std::runtime_error(std::string("[ error from 'libprogress-bar':'") + #where + "'] " + what);
+  throw std::runtime_error(std::string("[ error from 'libprogressbar':'") + #where + "'] " + what);
 
   class ProgressBar {
   private:
     // Total number of tasks
     const unsigned short _taskCount;
-    // the description for these tasks
-    const std::string _desc;
-
     // the progress bar color [filled]
     const BarColor _fillColor;
     // the progress bar color [empty]
@@ -64,22 +61,24 @@ namespace ns_pbar {
     // if thw progress bar is released
     bool _isReleased;
     // used to clear the last progress bar
-    unsigned short _lastProgressBarWidth{};
+    unsigned short _lastProgressBarWidth;
     // the start time point
     const double _startTimePoint;
     // the task index to display
-    unsigned short _taskIdxToShow;
-    // the thread to display progress bar
+    unsigned short _curTaskIdx;
+    // the description for current task
+    std::string _curTaskdesc;
 
   public:
     /**
      * @brief Construct a new Progress Bar object
      */
-    explicit ProgressBar(unsigned short taskCount, std::string desc = "New Task",
-                         BarColor fillColor = BarColor::WHITE, BarColor emptyColor = BarColor::NONE,
-                         std::ostream &os = std::clog)
-        : _taskCount(taskCount), _desc(std::move(desc)), _fillColor(fillColor), _emptyColor(emptyColor),
-          _os(&os), _isReleased(false), _startTimePoint(ProgressBar::curTime()), _taskIdxToShow(0) {}
+    explicit ProgressBar(unsigned short taskCount, BarColor fillColor = BarColor::WHITE,
+                         BarColor emptyColor = BarColor::NONE, std::ostream &os = std::clog)
+        : _taskCount(taskCount), _fillColor(fillColor), _emptyColor(emptyColor), _os(&os),
+          _isReleased(false), _lastProgressBarWidth(0), _startTimePoint(ProgressBar::curTime()),
+          _curTaskIdx(0), _curTaskdesc("New Task") {
+    }
 
     /**
      * @brief Destroy the Progress Bar object
@@ -93,7 +92,11 @@ namespace ns_pbar {
      */
     ProgressBar &release() {
       if (!this->_isReleased) {
+        // draw the 'finished' progress bar
+        this->setCurTask(_taskCount - 1, "finished");
+        // end drawing
         *this->_os << std::endl;
+        // release
         this->_isReleased = true;
       }
       return *this;
@@ -114,10 +117,12 @@ namespace ns_pbar {
     /**
      * @brief Set the Task Idx which would been displayed
      */
-    ProgressBar &setCurTask(unsigned short idx) {
+    ProgressBar &setCurTask(unsigned short idx, const std::string &desc) {
+      // check index
       this->checkIdx(idx);
+      this->_curTaskIdx = idx;
+      this->_curTaskdesc = desc;
       // show at once
-      this->_taskIdxToShow = idx;
       this->lock().unlock();
       return *this;
     }
@@ -130,11 +135,10 @@ namespace ns_pbar {
     }
 
     /**
-     * @brief print next progress bar, it's called when a task is done usually
+     * @brief print next progress bar
      */
     ProgressBar &unlock() {
-      unsigned short idx = this->_taskIdxToShow;
-      idx += 1;
+      unsigned short idx = this->_curTaskIdx + 1;
       auto progressBarWidth = static_cast<unsigned short>(ProgressBar::winWidth() * 0.7);
 
       // task count
@@ -146,6 +150,7 @@ namespace ns_pbar {
 
       // percent
       double curPercent = static_cast<double>(idx) / this->_taskCount;
+      
       std::stringstream stream;
       stream << std::fixed << std::setprecision(1) << curPercent * 100.0;
       std::string curPercentStr;
@@ -169,11 +174,11 @@ namespace ns_pbar {
 
       std::string progressBarStr = std::string(barWidth, ' ');
 
-      if (_desc.size() <= barWidth) {
+      if (_curTaskdesc.size() <= barWidth) {
         // fill description string
-        unsigned short descStartPos = (barWidth - _desc.size()) / 2;
-        unsigned short descEndPos = descStartPos + _desc.size();
-        progressBarStr.replace(progressBarStr.begin() + descStartPos, progressBarStr.begin() + descEndPos, _desc);
+        unsigned short descStartPos = (barWidth - _curTaskdesc.size()) / 2;
+        unsigned short descEndPos = descStartPos + _curTaskdesc.size();
+        progressBarStr.replace(progressBarStr.begin() + descStartPos, progressBarStr.begin() + descEndPos, _curTaskdesc);
       }
 
       fillStr = ProgressBar::colorFlag(this->_fillColor) + "\033[3m" + progressBarStr.substr(0, fillWidth) + ProgressBar::colorFlag(BarColor::NONE);
@@ -184,7 +189,7 @@ namespace ns_pbar {
       this->printBar('[' + taskCountStr + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
 #else
       // bar
-      int barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - _desc.size() - 12;
+      int barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - _curTaskdesc.size() - 12;
       // if left char size is small, than add more.
       if (barWidth < 5) {
         progressBarWidth += 5 - barWidth;
@@ -197,7 +202,7 @@ namespace ns_pbar {
       std::string emptyStr = std::string(emptyWidth, '-');
       std::string progressBarStr = fillStr + emptyStr;
 
-      this->printBar('[' + taskCountStr + "]-[" + _desc + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
+      this->printBar('[' + taskCountStr + "]-[" + _curTaskdesc + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
 #endif
 
       _lastProgressBarWidth = progressBarWidth + timeCostStr.size() + 6;
@@ -208,7 +213,7 @@ namespace ns_pbar {
      * @brief clear the progress bar
      */
     ProgressBar &lock() {
-      *this->_os << ("\r" + std::string(_lastProgressBarWidth, ' ') + "\r") << std::flush;
+      *this->_os << ('\r' + std::string(_lastProgressBarWidth, ' ') + '\r') << std::flush;
       return *this;
     }
 
@@ -218,7 +223,7 @@ namespace ns_pbar {
      */
     void checkIdx(unsigned short idx) const {
       if (idx >= this->_taskCount) {
-        THROW_EXCEPTION(checkIdx, "the index is out of range. ['curTaskIdx' > 'taskCount'].")
+        THROW_EXCEPTION(checkIdx, "the index is out of range. ['curTaskIdx' >= 'taskCount'].")
       }
     }
 
