@@ -55,14 +55,12 @@ namespace ns_pbar {
   };
 
 #define THROW_EXCEPTION(where, what) \
-  throw std::runtime_error(std::string("[ error from 'libprogress-bar':'") + #where + "'] " + what);
+  throw std::runtime_error(std::string("[ error from 'libprogressbar':'") + #where + "'] " + what);
 
   class ProgressBar {
   private:
     // Total number of tasks
     const unsigned short _taskCount;
-    // the description for these tasks
-    const std::string _desc;
 
     // the progress bar color [filled]
     const BarColor _fillColor;
@@ -79,19 +77,22 @@ namespace ns_pbar {
     // the start time point
     const double _startTimePoint;
     // the task index to display
-    unsigned short _taskIdxToShow;
+    unsigned short _curTaskIdx;
+    // the description for these tasks
+    std::string _curTaskDesc;
     // the thread to display progress bar
     std::thread *_showBarThread;
+    bool _threadFinished;
 
   public:
     /**
      * @brief Construct a new Progress Bar object
      */
-    explicit ProgressBar(unsigned short taskCount, std::string desc = "New Task",
-                         BarColor fillColor = BarColor::WHITE, BarColor emptyColor = BarColor::NONE,
-                         std::ostream &os = std::clog)
-        : _taskCount(taskCount), _desc(std::move(desc)), _fillColor(fillColor), _emptyColor(emptyColor),
-          _os(&os), _isReleased(false), _startTimePoint(ProgressBar::curTime()), _taskIdxToShow(0) {
+    explicit ProgressBar(unsigned short taskCount, BarColor fillColor = BarColor::WHITE,
+                         BarColor emptyColor = BarColor::NONE, std::ostream &os = std::clog)
+        : _taskCount(taskCount), _fillColor(fillColor), _emptyColor(emptyColor),
+          _os(&os), _isReleased(false), _lastProgressBarWidth(0), _startTimePoint(ProgressBar::curTime()),
+          _curTaskIdx(0), _curTaskDesc("New Task"), _showBarThread(nullptr), _threadFinished(false) {
       this->_showBarThread = new std::thread(&ProgressBar::run, this);
     }
 
@@ -100,8 +101,6 @@ namespace ns_pbar {
      */
     ~ProgressBar() {
       this->release();
-      this->_showBarThread->join();
-      delete this->_showBarThread;
     }
 
     /**
@@ -109,21 +108,26 @@ namespace ns_pbar {
      */
     ProgressBar &release() {
       if (!this->_isReleased) {
-        this->_isReleased = true;
         // for last time
-        std::lock_guard<std::mutex> lock(pbMtx);
-        this->show();
-        *this->_os << std::endl;
+        this->_isReleased = true;
+        // wait thread finished
+        while (!_threadFinished) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        // delete the thread
+        this->_showBarThread->join();
+        delete this->_showBarThread;
       }
       return *this;
     }
 
     /**
-     * @brief Set the Task Idx which would been displayed
+     * @brief set task to displayed
      */
-    ProgressBar &setCurTask(unsigned short idx) {
+    ProgressBar &setCurTask(unsigned short idx, const std::string &desc) {
       this->checkIdx(idx);
-      this->_taskIdxToShow = idx;
+      this->_curTaskIdx = idx;
+      this->_curTaskDesc = desc;
       return *this;
     }
 
@@ -136,10 +140,10 @@ namespace ns_pbar {
 
   protected:
     /**
-     * @brief print next progress bar, it's called when a task is done usually
+     * @brief print next progress bar
      */
     ProgressBar &show() {
-      unsigned short idx = this->_taskIdxToShow;
+      unsigned short idx = this->_curTaskIdx;
       idx += 1;
       auto progressBarWidth = static_cast<unsigned short>(ProgressBar::winWidth() * 0.7);
 
@@ -175,11 +179,11 @@ namespace ns_pbar {
 
       std::string progressBarStr = std::string(barWidth, ' ');
 
-      if (_desc.size() <= barWidth) {
+      if (_curTaskDesc.size() <= barWidth) {
         // fill description string
-        unsigned short descStartPos = (barWidth - _desc.size()) / 2;
-        unsigned short descEndPos = descStartPos + _desc.size();
-        progressBarStr.replace(progressBarStr.begin() + descStartPos, progressBarStr.begin() + descEndPos, _desc);
+        unsigned short descStartPos = (barWidth - _curTaskDesc.size()) / 2;
+        unsigned short descEndPos = descStartPos + _curTaskDesc.size();
+        progressBarStr.replace(progressBarStr.begin() + descStartPos, progressBarStr.begin() + descEndPos, _curTaskDesc);
       }
 
       fillStr = ProgressBar::colorFlag(this->_fillColor) + "\033[3m" + progressBarStr.substr(0, fillWidth) + ProgressBar::colorFlag(BarColor::NONE);
@@ -190,7 +194,7 @@ namespace ns_pbar {
       this->printBar('[' + taskCountStr + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
 #else
       // bar
-      int barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - _desc.size() - 12;
+      int barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - _curTaskDesc.size() - 12;
       // if left char size is small, than add more.
       if (barWidth < 5) {
         progressBarWidth += 5 - barWidth;
@@ -203,7 +207,7 @@ namespace ns_pbar {
       std::string emptyStr = std::string(emptyWidth, '-');
       std::string progressBarStr = fillStr + emptyStr;
 
-      this->printBar('[' + taskCountStr + "]-[" + _desc + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
+      this->printBar('[' + taskCountStr + "]-[" + _curTaskDesc + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
 #endif
 
       _lastProgressBarWidth = progressBarWidth + timeCostStr.size() + 6;
@@ -214,7 +218,7 @@ namespace ns_pbar {
      * @brief clear the progress bar
      */
     ProgressBar &clear() {
-      *this->_os << ("\r" + std::string(_lastProgressBarWidth, ' ') + "\r") << std::flush;
+      *this->_os << ('\r' + std::string(_lastProgressBarWidth, ' ') + '\r') << std::flush;
       return *this;
     }
 
@@ -228,9 +232,14 @@ namespace ns_pbar {
         // lock standard ostream
         std::lock_guard<std::mutex> lock(pbMtx);
         this->show();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
         this->clear();
       }
+      this->_curTaskDesc = "finished";
+      std::lock_guard<std::mutex> lock(pbMtx);
+      this->show();
+      *this->_os << std::endl;
+      _threadFinished = true;
     }
 
     /**

@@ -67,7 +67,7 @@ namespace ns_pbar {
     // the task index to display
     unsigned short _curTaskIdx;
     // the description for current task
-    std::string _curTaskdesc;
+    std::string _curTaskDesc;
 
   public:
     /**
@@ -77,7 +77,7 @@ namespace ns_pbar {
                          BarColor emptyColor = BarColor::NONE, std::ostream &os = std::clog)
         : _taskCount(taskCount), _fillColor(fillColor), _emptyColor(emptyColor), _os(&os),
           _isReleased(false), _lastProgressBarWidth(0), _startTimePoint(ProgressBar::curTime()),
-          _curTaskIdx(0), _curTaskdesc("New Task") {
+          _curTaskIdx(0), _curTaskDesc("New Task") {
     }
 
     /**
@@ -93,7 +93,7 @@ namespace ns_pbar {
     ProgressBar &release() {
       if (!this->_isReleased) {
         // draw the 'finished' progress bar
-        this->setCurTask(_taskCount - 1, "finished");
+        this->setCurTask(this->_curTaskIdx, "finished");
         // end drawing
         *this->_os << std::endl;
         // release
@@ -121,7 +121,7 @@ namespace ns_pbar {
       // check index
       this->checkIdx(idx);
       this->_curTaskIdx = idx;
-      this->_curTaskdesc = desc;
+      this->_curTaskDesc = desc;
       // show at once
       this->lock().unlock();
       return *this;
@@ -150,7 +150,7 @@ namespace ns_pbar {
 
       // percent
       double curPercent = static_cast<double>(idx) / this->_taskCount;
-      
+
       std::stringstream stream;
       stream << std::fixed << std::setprecision(1) << curPercent * 100.0;
       std::string curPercentStr;
@@ -174,11 +174,11 @@ namespace ns_pbar {
 
       std::string progressBarStr = std::string(barWidth, ' ');
 
-      if (_curTaskdesc.size() <= barWidth) {
+      if (_curTaskDesc.size() <= barWidth) {
         // fill description string
-        unsigned short descStartPos = (barWidth - _curTaskdesc.size()) / 2;
-        unsigned short descEndPos = descStartPos + _curTaskdesc.size();
-        progressBarStr.replace(progressBarStr.begin() + descStartPos, progressBarStr.begin() + descEndPos, _curTaskdesc);
+        unsigned short descStartPos = (barWidth - _curTaskDesc.size()) / 2;
+        unsigned short descEndPos = descStartPos + _curTaskDesc.size();
+        progressBarStr.replace(progressBarStr.begin() + descStartPos, progressBarStr.begin() + descEndPos, _curTaskDesc);
       }
 
       fillStr = ProgressBar::colorFlag(this->_fillColor) + "\033[3m" + progressBarStr.substr(0, fillWidth) + ProgressBar::colorFlag(BarColor::NONE);
@@ -189,7 +189,7 @@ namespace ns_pbar {
       this->printBar('[' + taskCountStr + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
 #else
       // bar
-      int barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - _curTaskdesc.size() - 12;
+      int barWidth = progressBarWidth - taskCountStr.size() - percentStr.size() - _curTaskDesc.size() - 12;
       // if left char size is small, than add more.
       if (barWidth < 5) {
         progressBarWidth += 5 - barWidth;
@@ -202,7 +202,7 @@ namespace ns_pbar {
       std::string emptyStr = std::string(emptyWidth, '-');
       std::string progressBarStr = fillStr + emptyStr;
 
-      this->printBar('[' + taskCountStr + "]-[" + _curTaskdesc + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
+      this->printBar('[' + taskCountStr + "]-[" + _curTaskDesc + "] |" + progressBarStr + "| [" + percentStr + "%]-[" + timeCostStr + "(S)]");
 #endif
 
       _lastProgressBarWidth = progressBarWidth + timeCostStr.size() + 6;
