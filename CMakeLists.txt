@@ -12,4 +12,4 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/src)
 
 set(CMAKE_INSTALL_PREFIX "/usr/local")
 
-install(FILES ${CMAKE_SOURCE_DIR}/src/include/progress_bar.hpp DESTINATION "include/artwork/progress-bar")
+install(FILES ${CMAKE_SOURCE_DIR}/src/include/progressbar.hpp DESTINATION "include/artwork/progress-bar")
