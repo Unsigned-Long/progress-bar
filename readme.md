@@ -31,7 +31,7 @@ output:
 the macro below controls the color, if this macro defined, the progress bar will be printed with color.
 
 ```cpp
-#define PROGRESS_COLOR_BAR
+#define PAR_USE_COLOR
 ```
 
 ```cpp
